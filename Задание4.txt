@@ -1,0 +1,98 @@
+#include <iostream>
+#include <vector>
+#include <map>
+#include <sstream>
+#include <algorithm>
+
+using namespace std;
+
+// Количество дней в каждом месяце (невисокосный год)
+const vector<int> daysInMonth = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+class Schedule {
+private:
+    int currentMonth = 0; // 0 - январь, 11 - декабрь
+    map<int, vector<string>> schedule; 
+
+public:
+    // Добавить пару в день `day`
+    void addClass(int day, const string& subject) {
+        if (day < 1 || day > daysInMonth[currentMonth]) {
+            cerr << "Incorrect day for the current month!" << endl;
+            return;
+        }
+        schedule[day].push_back(subject);
+    }
+
+    // Переход к следующему месяцу
+    void nextMonth() {
+        int prevMonthDays = daysInMonth[currentMonth];
+        currentMonth = (currentMonth + 1) % 12;
+        int newMonthDays = daysInMonth[currentMonth];
+
+        // Переносим все пары, которые не попадают в новый месяц, на предпоследний день нового месяца
+        map<int, vector<string>> newSchedule;
+        for (const auto& entry : schedule) {
+            int day = entry.first;
+            if (day <= newMonthDays) {
+                newSchedule[day] = entry.second;
+            } else {
+                int targetDay = newMonthDays - 1;
+                for (const auto& subject : entry.second) {
+                    newSchedule[targetDay].push_back(subject);
+                }
+            }
+        }
+        schedule = newSchedule;
+    }
+
+    // Просмотр расписания на день `day`
+    void viewDay(int day) const {
+        if (day < 1 || day > daysInMonth[currentMonth]) {
+            cerr << "Incorrect day for the current month!" << endl;
+            return;
+        }
+
+        auto it = schedule.find(day);
+        if (it == schedule.end() || it->second.empty()) {
+            cout << "In " << day << " day We are free!" << endl;
+        } else {
+            cout << "In " << day << " day " << it->second.size() << " classes in university: ";
+            for (size_t i = 0; i < it->second.size(); ++i) {
+                cout << it->second[i];
+                if (i != it->second.size() - 1) cout << ", ";
+            }
+            cout << endl;
+        }
+    }
+};
+
+int main() {
+    Schedule schedule;
+    int n;
+    cin >> n;
+    cin.ignore();
+
+    for (int i = 0; i < n; ++i) {
+        string line;
+        getline(cin, line);
+        istringstream iss(line);
+        string command;
+        iss >> command;
+
+        if (command == "CLASS") {
+            int day;
+            string subject;
+            iss >> day >> subject;
+            schedule.addClass(day, subject);
+        } else if (command == "NEXT") {
+            schedule.nextMonth();
+        } else if (command == "VIEW") {
+            int day;
+            iss >> day;
+            schedule.viewDay(day);
+        }
+    }
+
+    return 0;
+}

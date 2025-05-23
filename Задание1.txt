@@ -1,0 +1,493 @@
+С++
+#include <iostream>
+#include <string>
+#include <map>
+#include <vector>
+#include <iomanip>
+#include <algorithm>
+#include <sstream>
+
+using namespace std;
+
+struct Cell {
+    string address;
+    map<string, int> items;
+};
+
+class Warehouse {
+private:
+    vector<Cell> cells;
+    int totalCapacity;
+    int usedCapacity = 0;
+    
+    // Параметры склада
+    const vector<char> zones = {'A', 'B', 'C', 'D'};
+    const int shelvesPerZone = 8;
+    const int sectionsPerShelf = 2;
+    const int shelvesPerSection = 1;
+    const int maxItemsPerCell = 10;
+    
+    bool isValidAddress(const string& address) {
+        if (address.length() != 4) return false;
+        
+        // Проверяем зону
+        if (find(zones.begin(), zones.end(), address[0]) == zones.end()) 
+            return false;
+            
+        // Проверяем номер стеллажа (1-8)
+        int shelf = stoi(address.substr(1, 1));
+        if (shelf < 1 || shelf > shelvesPerZone) return false;
+        
+        // Проверяем номер секции (1-2)
+        int section = stoi(address.substr(2, 1));
+        if (section < 1 || section > sectionsPerShelf) return false;
+        
+        // Проверяем номер полки (1)
+        int shelfNum = stoi(address.substr(3, 1));
+        if (shelfNum < 1 || shelfNum > shelvesPerSection) return false;
+        
+        return true;
+    }
+    
+    Cell* findCell(const string& address) {
+        for (auto& cell : cells) {
+            if (cell.address == address) {
+                return &cell;
+            }
+        }
+        return nullptr;
+    }
+    
+public:
+    Warehouse() {
+        // Инициализируем все ячейки склада
+        for (char zone : zones) {
+            for (int shelf = 1; shelf <= shelvesPerZone; shelf++) {
+                for (int section = 1; section <= sectionsPerShelf; section++) {
+                    for (int shelfNum = 1; shelfNum <= shelvesPerSection; shelfNum++) {
+                        stringstream ss;
+                        ss << zone << shelf << section << shelfNum;
+                        cells.push_back({ss.str(), {}});
+                    }
+                }
+            }
+        }
+        totalCapacity = cells.size() * maxItemsPerCell;
+    }
+    
+    void addItem(const string& item, int quantity, const string& address) {
+        if (!isValidAddress(address)) {
+            cout << "Ошибка: Неверный адрес ячейки" << endl;
+            return;
+        }
+        
+        Cell* cell = findCell(address);
+        if (!cell) {
+            cout << "Ошибка: Ячейка не найдена" << endl;
+            return;
+        }
+        
+        // Вычисляем текущее количество товаров в ячейке
+        int currentQuantity = 0;
+        for (const auto& itemPair : cell->items) {
+            currentQuantity += itemPair.second;
+        }
+        
+        if (currentQuantity + quantity > maxItemsPerCell) {
+            cout << "Ошибка: Превышена вместимость ячейки (максимум " << maxItemsPerCell << " единиц)" << endl;
+            return;
+        }
+        
+        cell->items[item] += quantity;
+        usedCapacity += quantity;
+        cout << "Добавлено " << quantity << " единиц товара \"" << item << "\" в ячейку " << address << endl;
+    }
+    
+    void removeItem(const string& item, int quantity, const string& address) {
+        if (!isValidAddress(address)) {
+            cout << "Ошибка: Неверный адрес ячейки" << endl;
+            return;
+        }
+        
+        Cell* cell = findCell(address);
+        if (!cell) {
+            cout << "Ошибка: Ячейка не найдена" << endl;
+            return;
+        }
+        
+        if (cell->items.find(item) == cell->items.end() || cell->items[item] < quantity) {
+            cout << "Ошибка: Недостаточно товара \"" << item << "\" в ячейке " << address << endl;
+            return;
+        }
+        
+        cell->items[item] -= quantity;
+        usedCapacity -= quantity;
+        
+        if (cell->items[item] == 0) {
+            cell->items.erase(item);
+        }
+        
+        cout << "Удалено " << quantity << " единиц товара \"" << item << "\" из ячейки " << address << endl;
+    }
+    
+    void printInfo() {
+        // Общая загруженность склада
+        double totalUsage = (static_cast<double>(usedCapacity) / totalCapacity) * 100;
+        cout << "Общая загруженность склада: " << fixed << setprecision(2) << totalUsage << "%" << endl;
+        
+        // Загруженность по зонам
+        map<char, int> zoneCapacity;
+        map<char, int> zoneUsed;
+        
+        for (const auto& cell : cells) {
+            char zone = cell.address[0];
+            zoneCapacity[zone] += maxItemsPerCell;
+            
+            int cellUsed = 0;
+            for (const auto& item : cell.items) {
+                cellUsed += item.second;
+            }
+            zoneUsed[zone] += cellUsed;
+        }
+        
+        for (char zone : zones) {
+            double zoneUsage = (static_cast<double>(zoneUsed[zone]) / zoneCapacity[zone]) * 100;
+            cout << "Зона " << zone << " загружена на " << fixed << setprecision(2) << zoneUsage << "%" << endl;
+        }
+        
+        // Содержимое непустых ячеек
+        cout << "\nСодержимое ячеек:" << endl;
+        for (const auto& cell : cells) {
+            if (!cell.items.empty()) {
+                cout << "Ячейка " << cell.address << ": ";
+                for (const auto& item : cell.items) {
+                    cout << item.first << " (" << item.second << "), ";
+                }
+                cout << endl;
+            }
+        }
+        
+        // Пустые ячейки
+        cout << "\nПустые ячейки: ";
+        bool first = true;
+        for (const auto& cell : cells) {
+            if (cell.items.empty()) {
+                if (!first) cout << ", ";
+                cout << cell.address;
+                first = false;
+            }
+        }
+        cout << endl;
+    }
+};
+
+int main() {
+    Warehouse warehouse;
+    string command;
+    
+    cout << "Система учета товаров на складе" << endl;
+    cout << "Доступные команды:" << endl;
+    cout << "ADD <наименование> <количество> <адрес>" << endl;
+    cout << "REMOVE <наименование> <количество> <адрес>" << endl;
+    cout << "INFO" << endl;
+    cout << "EXIT" << endl;
+    
+    while (true) {
+        cout << ">>> ";
+        getline(cin, command);
+        
+        if (command.empty()) continue;
+        
+        if (command == "EXIT") {
+            break;
+        } else if (command == "INFO") {
+            warehouse.printInfo();
+        } else {
+            istringstream iss(command);
+            string cmd;
+            iss >> cmd;
+            
+            if (cmd == "ADD") {
+                string item, address;
+                int quantity;
+                if (iss >> item >> quantity >> address) {
+                    warehouse.addItem(item, quantity, address);
+                } else {
+                    cout << "Ошибка: Неверный формат команды ADD" << endl;
+                }
+            } else if (cmd == "REMOVE") {
+                string item, address;
+                int quantity;
+                if (iss >> item >> quantity >> address) {
+                    warehouse.removeItem(item, quantity, address);
+                } else {
+                    cout << "Ошибка: Неверный формат команды REMOVE" << endl;
+                }
+            } else {
+                cout << "Ошибка: Неизвестная команда" << endl;
+            }
+        }
+    }
+    
+    return 0;
+}
+ 
+ 
+Go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+type Cell struct {
+	Address string
+	Items   map[string]int
+}
+
+type Warehouse struct {
+	cells         []Cell
+	totalCapacity int
+	usedCapacity  int
+}
+
+func NewWarehouse() *Warehouse {
+	// Параметры склада для варианта 3
+	zones := []rune{'A', 'B', 'C', 'D'}
+	shelvesPerZone := 8
+	sectionsPerShelf := 2
+	shelvesPerSection := 1
+	maxItemsPerCell := 10
+
+	var cells []Cell
+
+	// Инициализируем все ячейки склада
+	for _, zone := range zones {
+		for shelf := 1; shelf <= shelvesPerZone; shelf++ {
+			for section := 1; section <= sectionsPerShelf; section++ {
+				for shelfNum := 1; shelfNum <= shelvesPerSection; shelfNum++ {
+					address := fmt.Sprintf("%c%d%d%d", zone, shelf, section, shelfNum)
+					cells = append(cells, Cell{Address: address, Items: make(map[string]int)})
+				}
+			}
+		}
+	}
+
+	totalCapacity := len(cells) * maxItemsPerCell
+	return &Warehouse{cells: cells, totalCapacity: totalCapacity}
+}
+
+func (w *Warehouse) isValidAddress(address string) bool {
+	if len(address) != 4 {
+		return false
+	}
+
+	// Проверяем зону
+	zone := rune(address[0])
+	validZones := []rune{'A', 'B', 'C', 'D'}
+	validZone := false
+	for _, z := range validZones {
+		if z == zone {
+			validZone = true
+			break
+		}
+	}
+	if !validZone {
+		return false
+	}
+
+	// Проверяем номер стеллажа (1-8)
+	shelf, err := strconv.Atoi(address[1:2])
+	if err != nil || shelf < 1 || shelf > 8 {
+		return false
+	}
+
+	// Проверяем номер секции (1-2)
+	section, err := strconv.Atoi(address[2:3])
+	if err != nil || section < 1 || section > 2 {
+		return false
+	}
+
+	// Проверяем номер полки (1)
+	shelfNum, err := strconv.Atoi(address[3:4])
+	if err != nil || shelfNum < 1 || shelfNum > 1 {
+		return false
+	}
+
+	return true
+}
+
+func (w *Warehouse) findCell(address string) *Cell {
+	for i := range w.cells {
+		if w.cells[i].Address == address {
+			return &w.cells[i]
+		}
+	}
+	return nil
+}
+
+func (w *Warehouse) AddItem(item string, quantity int, address string) {
+	if !w.isValidAddress(address) {
+		fmt.Println("Ошибка: Неверный адрес ячейки")
+		return
+	}
+
+	cell := w.findCell(address)
+	if cell == nil {
+		fmt.Println("Ошибка: Ячейка не найдена")
+		return
+	}
+
+	// Вычисляем текущее количество товаров в ячейке
+	currentQuantity := 0
+	for _, q := range cell.Items {
+		currentQuantity += q
+	}
+
+	if currentQuantity+quantity > 10 {
+		fmt.Println("Ошибка: Превышена вместимость ячейки (максимум 10 единиц)")
+		return
+	}
+
+	cell.Items[item] += quantity
+	w.usedCapacity += quantity
+	fmt.Printf("Добавлено %d единиц товара \"%s\" в ячейку %s\n", quantity, item, address)
+}
+
+func (w *Warehouse) RemoveItem(item string, quantity int, address string) {
+	if !w.isValidAddress(address) {
+		fmt.Println("Ошибка: Неверный адрес ячейки")
+		return
+	}
+
+	cell := w.findCell(address)
+	if cell == nil {
+		fmt.Println("Ошибка: Ячейка не найдена")
+		return
+	}
+
+	if current, exists := cell.Items[item]; !exists || current < quantity {
+		fmt.Printf("Ошибка: Недостаточно товара \"%s\" в ячейке %s\n", item, address)
+		return
+	}
+
+	cell.Items[item] -= quantity
+	w.usedCapacity -= quantity
+
+	if cell.Items[item] == 0 {
+		delete(cell.Items, item)
+	}
+
+	fmt.Printf("Удалено %d единиц товара \"%s\" из ячейки %s\n", quantity, item, address)
+}
+
+func (w *Warehouse) PrintInfo() {
+	// Общая загруженность склада
+	totalUsage := float64(w.usedCapacity) / float64(w.totalCapacity) * 100
+	fmt.Printf("Общая загруженность склада: %.2f%%\n", totalUsage)
+
+	// Загруженность по зонам
+	zoneCapacity := make(map[rune]int)
+	zoneUsed := make(map[rune]int)
+
+	for _, cell := range w.cells {
+		zone := rune(cell.Address[0])
+		zoneCapacity[zone] += 10
+
+		cellUsed := 0
+		for _, q := range cell.Items {
+			cellUsed += q
+		}
+		zoneUsed[zone] += cellUsed
+	}
+
+	zones := []rune{'A', 'B', 'C', 'D'}
+	for _, zone := range zones {
+		usage := float64(zoneUsed[zone]) / float64(zoneCapacity[zone]) * 100
+		fmt.Printf("Зона %c загружена на %.2f%%\n", zone, usage)
+	}
+
+	// Содержимое непустых ячеек
+	fmt.Println("\nСодержимое ячеек:")
+	for _, cell := range w.cells {
+		if len(cell.Items) > 0 {
+			fmt.Printf("Ячейка %s: ", cell.Address)
+			for item, quantity := range cell.Items {
+				fmt.Printf("%s (%d), ", item, quantity)
+			}
+			fmt.Println()
+		}
+	}
+
+	// Пустые ячейки
+	fmt.Print("\nПустые ячейки: ")
+	first := true
+	for _, cell := range w.cells {
+		if len(cell.Items) == 0 {
+			if !first {
+				fmt.Print(", ")
+			}
+			fmt.Print(cell.Address)
+			first = false
+		}
+	}
+	fmt.Println()
+}
+
+func main() {
+	warehouse := NewWarehouse()
+	scanner := bufio.NewScanner(os.Stdin)
+
+	fmt.Println("Система учета товаров на складе")
+	fmt.Println("Доступные команды:")
+	fmt.Println("ADD <наименование> <количество> <адрес>")
+	fmt.Println("REMOVE <наименование> <количество> <адрес>")
+	fmt.Println("INFO")
+	fmt.Println("EXIT")
+
+	for {
+		fmt.Print(">>> ")
+		scanner.Scan()
+		command := scanner.Text()
+
+		if command == "" {
+			continue
+		}
+
+		if command == "EXIT" {
+			break
+		} else if command == "INFO" {
+			warehouse.PrintInfo()
+		} else {
+			parts := strings.Fields(command)
+			if len(parts) < 4 {
+				fmt.Println("Ошибка: Неверный формат команды")
+				continue
+			}
+
+			cmd := parts[0]
+			switch cmd {
+			case "ADD":
+				quantity, err := strconv.Atoi(parts[2])
+				if err != nil {
+					fmt.Println("Ошибка: Неверное количество товара")
+					continue
+				}
+				warehouse.AddItem(parts[1], quantity, parts[3])
+			case "REMOVE":
+				quantity, err := strconv.Atoi(parts[2])
+				if err != nil {
+					fmt.Println("Ошибка: Неверное количество товара")
+					continue
+				}
+				warehouse.RemoveItem(parts[1], quantity, parts[3])
+			default:
+				fmt.Println("Ошибка: Неизвестная команда")
+			}
+		}
+	}
+}

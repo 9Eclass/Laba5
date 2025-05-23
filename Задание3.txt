@@ -1,0 +1,189 @@
+airplane.h
+#ifndef AIRPLANE_H
+#define AIRPLANE_H
+
+#include <vector>
+#include <string>
+#include <map>
+#include <set>
+
+enum class Command {
+    CREATE_PLANE,
+    PLANES_FOR_TOWN,
+    TOWNS_FOR_PLANE,
+    PLANES
+};
+
+void createPlane(const std::string& planeName, const std::vector<std::string>& towns);
+std::set<std::string> getPlanesForTown(const std::string& townName);
+std::map<std::string, std::set<std::string>> getTownsForPlane(const std::string& planeName);
+std::map<std::string, std::vector<std::string>> getAllPlanes();
+
+#endif // AIRPLANE_H
+airplane.cpp
+#include "airplane.h"
+#include <algorithm>
+
+// Глобальные структуры для хранения данных
+static std::map<std::string, std::vector<std::string>> planes; 
+static std::map<std::string, std::set<std::string>> towns;     
+
+void createPlane(const std::string& planeName, const std::vector<std::string>& townsList) {
+    // Удаляем старые данные, если самолет уже существует
+    if (planes.find(planeName) != planes.end()) {
+        // Удаляем самолет из всех городов, где он был зарегистрирован
+        for (const auto& town : planes[planeName]) {
+            towns[town].erase(planeName);
+            if (towns[town].empty()) {
+                towns.erase(town);
+            }
+        }
+    }
+    
+    // Добавляем новые данные
+    planes[planeName] = townsList;
+    for (const auto& town : townsList) {
+        towns[town].insert(planeName);
+    }
+}
+
+std::set<std::string> getPlanesForTown(const std::string& townName) {
+    if (towns.find(townName) != towns.end()) {
+        return towns[townName];
+    }
+    return {};
+}
+
+std::map<std::string, std::set<std::string>> getTownsForPlane(const std::string& planeName) {
+    std::map<std::string, std::set<std::string>> result;
+    
+    if (planes.find(planeName) != planes.end()) {
+        for (const auto& town : planes[planeName]) {
+            std::set<std::string> otherPlanes = towns[town];
+            otherPlanes.erase(planeName); // исключаем текущий самолет
+            result[town] = otherPlanes;
+        }
+    }
+    
+    return result;
+}
+
+std::map<std::string, std::vector<std::string>> getAllPlanes() {
+    return planes;
+}
+main.cpp
+#include <iostream>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <algorithm>
+#include "airplane.h"
+
+using namespace std;
+
+vector<string> split(const string &s) {
+    vector<string> result;
+    istringstream iss(s);
+    for (string token; iss >> token; ) {
+        result.push_back(token);
+    }
+    return result;
+}
+
+Command parseCommand(const string& cmd) {
+    if (cmd == "CREATE_PLANE") return Command::CREATE_PLANE;
+    if (cmd == "PLANES_FOR_TOWN") return Command::PLANES_FOR_TOWN;
+    if (cmd == "TOWNS_FOR_PLANE") return Command::TOWNS_FOR_PLANE;
+    if (cmd == "PLANES") return Command::PLANES;
+    throw invalid_argument("Unknown command");
+}
+
+int main() {
+    string line;
+    
+    while (getline(cin, line)) {
+        if (line.empty()) continue;
+        
+        auto tokens = split(line);
+        if (tokens.empty()) continue;
+        
+        try {
+            Command cmd = parseCommand(tokens[0]);
+            
+            switch (cmd) {
+                case Command::CREATE_PLANE: {
+                    if (tokens.size() < 3) {
+                        cerr << "Incorrect command format for CREATE_PLANE" << endl;
+                        break;
+                    }
+                    string planeName = tokens[1];
+                    vector<string> townsList(tokens.begin() + 2, tokens.end());
+                    createPlane(planeName, townsList);
+                    break;
+                }
+                case Command::PLANES_FOR_TOWN: {
+                    if (tokens.size() != 2) {
+                        cerr << "Incorrect command format for PLANES_FOR_TOWN" << endl;
+                        break;
+                    }
+                    string townName = tokens[1];
+                    auto planes = getPlanesForTown(townName);
+                    if (planes.empty()) {
+                        cout << "No planes for town " << townName << endl;
+                    } else {
+                        cout << "Planes for town " << townName << ":";
+                        for (const auto& plane : planes) {
+                            cout << " " << plane;
+                        }
+                        cout << endl;
+                    }
+                    break;
+                }
+                case Command::TOWNS_FOR_PLANE: {
+                    if (tokens.size() != 2) {
+                        cerr << "Incorrect command format for TOWNS_FOR_PLANE" << endl;
+                        break;
+                    }
+                    string planeName = tokens[1];
+                    auto townsInfo = getTownsForPlane(planeName);
+                    if (townsInfo.empty()) {
+                        cout << "No information about plane " << planeName << endl;
+                    } else {
+                        cout << "Towns for plane " << planeName << ":" << endl;
+                        for (const auto& [town, otherPlanes] : townsInfo) {
+                            cout << "  " << town << ":";
+                            if (otherPlanes.empty()) {
+                                cout << " no other planes";
+                            } else {
+                                for (const auto& plane : otherPlanes) {
+                                    cout << " " << plane;
+                                }
+                            }
+                            cout << endl;
+                        }
+                    }
+                    break;
+                }
+                case Command::PLANES: {
+                    auto allPlanes = getAllPlanes();
+                    if (allPlanes.empty()) {
+                        cout << "No planes available" << endl;
+                    } else {
+                        for (const auto& [plane, townsList] : allPlanes) {
+                            cout << "PLANE " << plane << ":";
+                            for (const auto& town : townsList) {
+                                cout << " " << town;
+                            }
+                            cout << endl;
+                        }
+                    }
+                    break;
+                }
+            }
+        } catch (const invalid_argument& e) {
+            cerr << "Error: " << e.what() << endl;
+        }
+    }
+    
+    return 0;
+}

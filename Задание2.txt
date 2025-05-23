@@ -1,0 +1,254 @@
+C++
+#include <iostream>
+#include <vector>
+#include <queue>
+#include <string>
+#include <iomanip>
+#include <sstream>
+#include <algorithm>
+#include <numeric>
+
+using namespace std;
+
+struct Ticket {
+    string number;
+    int duration;
+};
+
+string generateTicketNumber() {
+    static int counter = 0;
+    stringstream ss;
+    ss << "T" << setw(3) << setfill('0') << counter++;
+    return ss.str();
+}
+
+// Компаратор для сортировки задач по убыванию длительности
+bool compareTickets(const Ticket& a, const Ticket& b) {
+    return a.duration > b.duration;
+}
+
+vector<vector<Ticket>> distributeQueue(queue<Ticket>& q, int windows) {
+    // Преобразуем очередь в вектор для сортировки
+    vector<Ticket> tickets;
+    while (!q.empty()) {
+        tickets.push_back(q.front());
+        q.pop();
+    }
+    
+    // Сортируем задачи по убыванию длительности
+    sort(tickets.begin(), tickets.end(), compareTickets);
+    
+    vector<vector<Ticket>> result(windows);
+    vector<int> windowTimes(windows, 0);
+    
+    // Распределяем задачи, всегда добавляя в наименее загруженное окно
+    for (const auto& ticket : tickets) {
+        auto min_it = min_element(windowTimes.begin(), windowTimes.end());
+        int minWindow = distance(windowTimes.begin(), min_it);
+        
+        result[minWindow].push_back(ticket);
+        windowTimes[minWindow] += ticket.duration;
+    }
+    
+    return result;
+}
+
+int main() {
+    int windows;
+    cout << ">>> Введите кол-во окон" << endl;
+    cout << "<<< ";
+    cin >> windows;
+
+    if (windows <= 0) {
+        cout << ">>> Ошибка: количество окон должно быть положительным" << endl;
+        return 1;
+    }
+
+    queue<Ticket> ticketQueue;
+    string command;
+
+    while (true) {
+        cout << "<<< ";
+        cin >> command;
+
+        if (command == "ENQUEUE") {
+            int duration;
+            if (!(cin >> duration) || duration <= 0) {
+                cout << ">>> Ошибка: продолжительность должна быть положительным числом" << endl;
+                cin.clear();
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                continue;
+            }
+            
+            Ticket newTicket;
+            newTicket.number = generateTicketNumber();
+            newTicket.duration = duration;
+            
+            ticketQueue.push(newTicket);
+            cout << ">>> " << newTicket.number << endl;
+        }
+        else if (command == "DISTRIBUTE") {
+            if (ticketQueue.empty()) {
+                cout << ">>> Очередь пуста" << endl;
+                continue;
+            }
+            
+            vector<vector<Ticket>> distribution = distributeQueue(ticketQueue, windows);
+            
+            // Вычисляем общее время для каждого окна
+            vector<int> totalTimes(windows, 0);
+            for (int i = 0; i < windows; i++) {
+                for (const auto& ticket : distribution[i]) {
+                    totalTimes[i] += ticket.duration;
+                }
+            }
+            
+            // Выводим статистику по окнам
+            for (int i = 0; i < windows; i++) {
+                cout << ">>> Окно " << i + 1 << " (" << totalTimes[i] << " минут): ";
+                
+                for (size_t j = 0; j < distribution[i].size(); j++) {
+                    if (j > 0) cout << ", ";
+                    cout << distribution[i][j].number;
+                }
+                cout << endl;
+            }
+            
+            break;
+        }
+        else {
+            cout << ">>> Неизвестная команда. Доступные команды: ENQUEUE, DISTRIBUTE" << endl;
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        }
+    }
+    
+    return 0;
+}
+    
+    return 0;
+} 
+Go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+// Ticket represents a service ticket with a number and duration
+type Ticket struct {
+	Number   string
+	Duration int
+}
+
+var ticketCounter int = 0
+
+// generateTicketNumber creates a new unique ticket number
+func generateTicketNumber() string {
+	number := fmt.Sprintf("T%03d", ticketCounter)
+	ticketCounter++
+	return number
+}
+
+// ByDurationDesc implements sort.Interface for []Ticket based on the Duration field descending
+type ByDurationDesc []Ticket
+
+func (a ByDurationDesc) Len() int           { return len(a) }
+func (a ByDurationDesc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByDurationDesc) Less(i, j int) bool { return a[i].Duration > a[j].Duration }
+
+// distributeQueue distributes tickets across windows for optimal load balancing
+func distributeQueue(tickets []Ticket, windows int) [][]Ticket {
+	sort.Sort(ByDurationDesc(tickets))
+
+	result := make([][]Ticket, windows)
+	windowTimes := make([]int, windows)
+
+	for _, ticket := range tickets {
+		minIndex := 0
+		for i := 1; i < windows; i++ {
+			if windowTimes[i] < windowTimes[minIndex] {
+				minIndex = i
+			}
+		}
+		result[minIndex] = append(result[minIndex], ticket)
+		windowTimes[minIndex] += ticket.Duration
+	}
+
+	return result
+}
+
+func main() {
+	scanner := bufio.NewScanner(os.Stdin)
+	var windows int
+
+	fmt.Println(">>> Введите количетсво окон")
+	fmt.Print("<<< ")
+	scanner.Scan()
+	input := scanner.Text()
+	w, err := strconv.Atoi(strings.TrimSpace(input))
+	if err != nil || w <= 0 {
+	  fmt.Println(">>> Ошибка: Количество окон должно быть положительным числом")
+		return
+	}
+	windows = w
+
+	var ticketQueue []Ticket
+
+	for {
+		fmt.Print("<<< ")
+		if !scanner.Scan() {
+			break
+		}
+		commandLine := strings.TrimSpace(scanner.Text())
+		parts := strings.Fields(commandLine)
+		if len(parts) == 0 {
+			continue
+		}
+		command := strings.ToUpper(parts[0])
+
+		switch command {
+		case "ENQUEUE":
+			if len(parts) < 2 {
+				fmt.Println(">>> Ошибка: ENQUEUE требует продолжительность")
+				continue
+			}
+			duration, err := strconv.Atoi(parts[1])
+			if err != nil || duration <= 0 {
+				fmt.Println(">>> Ошибка: длительность должна быть положительным целым числом")
+				continue
+			}
+			ticket := Ticket{
+				Number:   generateTicketNumber(),
+				Duration: duration,
+			}
+			ticketQueue = append(ticketQueue, ticket)
+			fmt.Printf(">>> %s\n", ticket.Number)
+
+		case "DISTRIBUTE":
+			if len(ticketQueue) == 0 {
+				fmt.Println(">>> Очередь пуста")
+				continue
+			}
+			distribution := distributeQueue(ticketQueue, windows)
+			for i, window := range distribution {
+				totalTime := 0
+				var ticketNumbers []string
+				for _, ticket := range window {
+					totalTime += ticket.Duration
+					ticketNumbers = append(ticketNumbers, ticket.Number)
+				}
+				fmt.Printf(">>> Окно %d (%d Минуты): %s\n", i+1, totalTime, strings.Join(ticketNumbers, ", "))
+			}
+			ticketQueue = []Ticket{} // clear queue after distribution
+
+		default:
+			fmt.Println(">>> Неизвестная команда. Доступные команды: ENQUEUE, DISTRIBUTE")
+		}
+	}
+}
